@@ -1693,3 +1693,19 @@ textarea.field { resize: vertical; min-height: 90px; }
 .lightbox-nav.prev { left: 18px; }
 .lightbox-nav.next { right: 18px; }
 .lightbox-hint { padding: 8px 18px 14px; text-align: center; color: rgba(255,255,255,0.55); font-size: 12px; }
+@media (max-width: 768px) {  .ideas-page { padding: 16px 12px 40px; }  .ideas-page .page-head { flex-direction: column; align-items: stretch; }  .ideas-page .page-head > div { min-width: 0; width: 100%; }  .ideas-page .page-head > button { align-self: flex-start; }  .ideas-page .page-title { flex-wrap: nowrap; white-space: nowrap; }  .ideas-page .page-subtitle { width: 100%; }  .ideas-page .idea-sort { width: 100%; flex-wrap: wrap; }  .ideas-page .kanban { grid-template-columns: 1fr; width: 100%; }  .ideas-page .kanban-col { width: 100%; min-width: 0; }  .ideas-page .kanban-col-head { flex-wrap: nowrap; white-space: nowrap; }  .ideas-page .kanban-col-head .kanban-dot, .ideas-page .kanban-col-head .kanban-count { flex: none; }  .ideas-page .kanban-empty { width: 100%; }}
+@media (max-width: 768px) { .chat-input-area { padding: 10px 12px 18px; } .composer { width: 100%; min-width: 0; } .composer-top { flex-direction: column; align-items: stretch; } .composer-top .composer-hint { align-self: flex-start; } .composer-top .chat-input { width: 100%; min-height: 48px; } .composer-hint { white-space: nowrap; } .composer-bar { flex-wrap: wrap; } .composer-bar-left { flex: 1 1 auto; flex-wrap: wrap; min-width: 0; } .composer-bar-right { flex: none; margin-left: auto; } .composer-bar-right .send-btn { flex: none; }}
+@media (max-width: 768px) { .gallery-page { padding: 16px 12px 40px; } .gallery-page .gallery-head { flex-direction: column; align-items: stretch; } .gallery-page .gallery-head > div { min-width: 0; width: 100%; flex-wrap: wrap; } .gallery-page .page-title { flex-wrap: nowrap; white-space: nowrap; } .gallery-page .page-title .crumb { white-space: nowrap; } .gallery-page .page-subtitle { width: 100%; }}
+
+/* model-picker-mobile-fix: mobile only, scoped to .model-picker */
+@media (max-width: 768px) {
+  .model-picker { max-width: 100%; min-width: 0; }
+  .model-picker-btn { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .model-picker-pop { position: fixed; left: 12px; right: 12px; bottom: 12px; width: auto; max-width: none; max-height: 70vh; box-sizing: border-box; overflow-x: hidden; z-index: 60; }
+  .model-picker-head { flex-wrap: wrap; }
+  .model-picker-search { flex: 1 1 100%; width: 100%; min-width: 0; box-sizing: border-box; }
+  .model-picker-list { max-height: calc(70vh - 130px); overflow-y: auto; overflow-x: hidden; }
+  .model-picker-item { width: 100%; box-sizing: border-box; white-space: normal; text-align: left; }
+  .model-picker-item-name { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
+  .model-picker-reset { width: 100%; box-sizing: border-box; }
+}

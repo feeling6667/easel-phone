@@ -3489,6 +3489,8 @@ async def _run_direct_chat(req: ChatRequest, sk: str, content, system: str, emit
     claimed = False
     locked = False
     settings = read_settings(ENV_FILE)
+    if getattr(req, "model", None):
+        settings["EASEL_DIRECT_API_MODEL"] = str(req.model).strip()
     task = asyncio.current_task()
     _DIRECT_CHAT_TASKS.add(task)
     if lock.locked():
