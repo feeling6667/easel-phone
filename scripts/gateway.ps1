@@ -152,8 +152,21 @@ switch ($args[0]) {
         Write-Host "[easel] Starting Easel gateway (profile: $ProfileName, port: $Port)..."
         # 【本机补丁】官方这里用 `openclaw`（PATH .cmd shim）+ powershell -Command，
         # 本机跑不通。改为绝对路径 node + openclaw.mjs 直接起，并先收敛重名环境变量键。
-        if (-not (Test-Path $NodeExe))  { Write-Error "找不到 node: $NodeExe"; exit 1 }
-        if (-not (Test-Path $OpenClaw)) { Write-Error "找不到 openclaw.mjs: $OpenClaw"; exit 1 }
+        # 本机路径（.easel-tools\node24）只在作者机器上存在；CI/新机器上
+        # setup.ps1 装的是全局 openclaw + PATH 上的 Node，这里回退到 PATH/npm。
+        if (-not (Test-Path $NodeExe)) {
+            $sysNode = Get-Command node -ErrorAction SilentlyContinue
+            if ($sysNode) { $NodeExe = $sysNode.Path }
+            else { Write-Error "找不到 node: $NodeExe"; exit 1 }
+        }
+        if (-not (Test-Path $OpenClaw)) {
+            $npmRoot = $null
+            try { $npmRoot = (npm root -g 2>$null).Trim() } catch { }
+            $cand = $null
+            if ($npmRoot) { $cand = Join-Path $npmRoot 'openclaw\openclaw.mjs' }
+            if ($cand -and (Test-Path $cand)) { $OpenClaw = $cand }
+            else { Write-Error "找不到 openclaw.mjs: $OpenClaw"; exit 1 }
+        }
         # 注意：不要在这里给 $env:PATH 赋值。PS 5.1 的 $env: 提供程序在写入大小写
         # 不一致的变量名时会产生重复键（Path / PATH），随后 Start-Process 会抛
         # “已添加项。字典中的关键字:'PATH'”。既然 node 与 openclaw.mjs 都用了绝对
