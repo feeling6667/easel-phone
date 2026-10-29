@@ -50,6 +50,10 @@ jobs:
       # CI 也全绿，但那部分从来没在 CI 上跑过。从根目录跑一次，两边都覆盖。
       - name: Run unit tests
         timeout-minutes: 10
+        # output_paths._discover_root() needs an outputs/ dir or EASEL_ROOT;
+        # a fresh checkout has neither, so collection fails without this.
+        env:
+          EASEL_ROOT: ${{ github.workspace }}
         run: python -m pytest -v -o faulthandler_timeout=90
 
   harness-portability:
@@ -188,7 +192,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          # openclaw@2026.10.8 requires Node >=24.22.1 <25 || >=26.12.1;
+          # setup-node '24' resolved to 24.21.0 and the install failed.
+          node-version: '24.22.1'
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
