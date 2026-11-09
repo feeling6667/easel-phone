@@ -219,7 +219,7 @@ def test_ssrf_guard_rejects_internal(url):
     assert web._ssrf_safe(url) is False
 
 
-# 本机回环是**故意放行**的：2026-10-12 的本机补丁让设置面板能填
+# 【本机补丁 2026-10-12】回环是**故意放行**的：让设置面板能填
 # magpie（http://127.0.0.1:3425/v1）这类本机中转。放行范围只有 loopback，
 # 上面的内网/元数据仍被拒，所以补丁没有扩大「拿工作台当跳板」的风险面。
 # 需要恢复官方严格行为时设 EASEL_ALLOW_LOOPBACK_MODEL_ENDPOINT=0。

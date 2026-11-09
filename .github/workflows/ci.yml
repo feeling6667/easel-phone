@@ -28,6 +28,10 @@ jobs:
         run: python scripts/validate_skill_commands.py
       - name: Validate documentation and Agent prompt paths
         run: python scripts/validate_document_paths.py
+      # 本仓库是分叉：哪些地方和上游不一样，必须是可枚举的。
+      # 新增/调整分叉标记后忘了跑 --write，这一步会红。
+      - name: Local patch ledger
+        run: python scripts/local_patches.py --check
 
   test:
     name: pytest (${{ matrix.os }})

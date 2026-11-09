@@ -14,7 +14,7 @@ skills/
 
 ```
 skill-xxx/
-├── SKILL.md               必须 — 执行流程（精简，< 200 行）
+├── SKILL.md               必须 — 执行流程（精简，≤ 600 行）
 ├── references/            可选 — 领域知识（按需加载，不常驻 prompt）
 │   └── *.md
 ├── scripts/               可选 — 可执行脚本（运行时调用，代码不进 prompt）
@@ -72,11 +72,11 @@ layer: discover / plan / produce / publish / attribute / general
 
 **frontmatter 规则：**
 - 只保留 `name`、`description`、`layer` 三个常规字段，减少常驻路由上下文和无效元数据
-- `description` 是 Agent 的主要触发依据，必须用中文同时写清能力、触发场景/用户说法和相邻 SKILL 边界；可使用 YAML 块标量
+- `description` 是 Agent 的主要触发依据，必须写清能力、触发场景/用户说法和相邻 SKILL 边界（中文「当用户…」或英文 `MUST USE when…` 均可，长度 80–300 字）；可使用 YAML 块标量
 - `layer` 标明所属层：五个流水线层 `discover / plan / produce / publish / attribute`，外加 `general`（跨切面基础设施，如画像管理、产物管理、模板库——不属于任一流水线阶段）
 - 仅在 OpenClaw 需要判断操作系统、二进制、环境变量或安装方式时，允许增加 `metadata.openclaw` 运行时清单
 - 禁止 `version`、`profile_aware`、`self_developed`、普通 `metadata.trigger/impl/source`、`allowed-tools`、`tags`；来源信息放 `EASEL-META.md`，执行约束和 Profile 行为写正文
-- SKILL.md 主体控制在 200 行以内
+- SKILL.md 主体控制在 600 行以内：能自带完整流程的优先自带（拆到 `references/` 后，多数客户端不会自动加载，等于功能残缺）；超过 600 行才强制拆分
 
 全库校验：
 
