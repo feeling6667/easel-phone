@@ -3046,15 +3046,18 @@ class _CrossProcLock:
 #   字段 run_id / tool_name / tool_call_id / status / occurred_at(epoch ms)。
 # 由 openclaw 主进程独立写入，所以 web 侧可以无侵入只读轮询（sqlite 只读 + 短超时，
 # 每 1.2s 一次，锁冲突就跳过本轮），完全不碰 agent 的写入路径。
-_AUDIT_DB_CANDIDATES = (
-    Path.home() / ".openclaw-easel" / "state" / "openclaw.sqlite",
-    Path.home() / ".openclaw" / "state" / "openclaw.sqlite",
-)
+def _audit_db_candidates() -> tuple[Path, ...]:
+    """候选 audit 库。第一个走 easel.openclaw_workspace.state_dir()，
+    这样 EASEL_OPENCLAW_STATE_DIR 一处覆盖就能让测试/多实例隔离生效（#62 的收口要求）。"""
+    return (
+        _oc_state_dir() / "state" / "openclaw.sqlite",
+        Path.home() / ".openclaw" / "state" / "openclaw.sqlite",
+    )
 
 
 def _audit_db_file() -> Path | None:
     """定位 audit 库；同时兼容 OPENCLAW_STATE_DIR 之类的自定义部署。"""
-    cands = list(_AUDIT_DB_CANDIDATES)
+    cands = list(_audit_db_candidates())
     env_dir = os.environ.get("OPENCLAW_STATE_DIR") or os.environ.get("OPENCLAW_HOME")
     if env_dir:
         cands.insert(0, Path(env_dir) / "state" / "openclaw.sqlite")
@@ -3179,7 +3182,7 @@ def _recent_run_ids(db: Path, since_ms: int, limit: int = 4) -> list[str]:
 # 最好的现成来源：比裸的 exec/process 可读得多，也不含命令正文（不泄露敏感内容）。
 def _trajectory_dbs() -> list[Path]:
     """所有 agent 的轨迹库（通常只有 main 一个）。"""
-    roots = [Path.home() / ".openclaw-easel", Path.home() / ".openclaw"]
+    roots = [_oc_state_dir(), Path.home() / ".openclaw"]
     env_dir = os.environ.get("OPENCLAW_STATE_DIR") or os.environ.get("OPENCLAW_HOME")
     if env_dir:
         roots.insert(0, Path(env_dir))

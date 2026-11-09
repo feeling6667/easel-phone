@@ -14,7 +14,18 @@ ALLOWED_KEYS = {"name", "description", "layer", "metadata"}
 LAYERS = {"discover", "plan", "produce", "publish", "attribute", "general"}
 INTENTIONAL_NAME_MISMATCHES = {"skill-xhs-analyzer": "redbook"}
 KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$")
-TRIGGER_RE = re.compile(r"当用户|触发|使用时机|适用场景|用户说|用户问|用户需要|用于")
+# 触发语检查：中文技能用「当用户/触发/…」，英文技能用 "MUST USE when / use when"。
+# 早期只认中文关键词，导致 agent-reach 这类上游英文技能永远过不了——它的 description
+# 明明写着 "MUST USE when user wants to research…"，规则却判「没说明触发时机」。
+TRIGGER_RE = re.compile(
+    r"当用户|触发|使用时机|适用场景|用户说|用户问|用户需要|用于"
+    r"|MUST USE|use when|when the user|when user",
+    re.IGNORECASE,
+)
+# SKILL.md 行数上限。200 行对「单文件重型技能」（dbs-content-system 那种操作手册）不现实：
+# 一个技能要么自带完整流程，要么就得拆成 references/ 让 agent 额外读文件——后者在多数
+# 客户端里不会自动加载，等于功能残缺。所以上限放到 600，超过 600 才要求拆分。
+MAX_SKILL_LINES = 600
 LEGACY_OUTPUT_DIRS = {
     "ai-image", "ai-music", "ai-video", "audio-denoise", "audio-editing",
     "audio-mix", "audio-visualizer", "auto-short-video", "auto-subtitle",
@@ -125,8 +136,10 @@ def validate(path: Path) -> list[str]:
     ):
         errors.append("metadata is allowed only as a metadata.openclaw runtime manifest")
     line_count = len(text.splitlines())
-    if line_count > 200:
-        errors.append(f"SKILL.md must stay within 200 lines, got {line_count}")
+    if line_count > MAX_SKILL_LINES:
+        errors.append(
+            f"SKILL.md must stay within {MAX_SKILL_LINES} lines, got {line_count}"
+        )
     for target in re.findall(r"\[[^]]+\]\(([^)]+)\)", text):
         clean = target.split("#", 1)[0].strip()
         if not clean or clean in {"URL", "url", "{URL}"} or "://" in clean:

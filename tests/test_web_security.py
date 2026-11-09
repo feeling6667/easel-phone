@@ -210,15 +210,38 @@ def test_valid_base_url(url, ok):
 # ---- 自测探针会把真 Key 当 Bearer 发出去：不许指向本机/内网/云元数据 ----
 
 @pytest.mark.parametrize("url", [
-    "http://127.0.0.1:18789/v1",
-    "http://localhost/v1",
     "http://169.254.169.254/latest",      # 云元数据
     "http://10.0.0.1/v1",
     "http://192.168.1.1/v1",
-    "http://[::1]/v1",
     "http://no-such-host-zzz.invalid/v1",  # 解析不了就当不安全
 ])
 def test_ssrf_guard_rejects_internal(url):
+    assert web._ssrf_safe(url) is False
+
+
+# 本机回环是**故意放行**的：2026-10-12 的本机补丁让设置面板能填
+# magpie（http://127.0.0.1:3425/v1）这类本机中转。放行范围只有 loopback，
+# 上面的内网/元数据仍被拒，所以补丁没有扩大「拿工作台当跳板」的风险面。
+# 需要恢复官方严格行为时设 EASEL_ALLOW_LOOPBACK_MODEL_ENDPOINT=0。
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:3425/v1",
+    "http://127.0.0.1:18789/v1",
+    "http://localhost/v1",
+    "http://[::1]/v1",
+])
+def test_ssrf_guard_allows_loopback_by_default(url, monkeypatch):
+    monkeypatch.delenv("EASEL_ALLOW_LOOPBACK_MODEL_ENDPOINT", raising=False)
+    assert web._ssrf_safe(url) is True
+
+
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:18789/v1",
+    "http://localhost/v1",
+    "http://[::1]/v1",
+])
+def test_ssrf_guard_loopback_can_be_disabled(url, monkeypatch):
+    """开关必须真的能关回官方行为，否则补丁就成了无法回退的漏洞。"""
+    monkeypatch.setenv("EASEL_ALLOW_LOOPBACK_MODEL_ENDPOINT", "0")
     assert web._ssrf_safe(url) is False
 
 
@@ -387,10 +410,18 @@ def test_pin_transport_never_pins_cli(_tp):
 
 
 def test_http_mode_drops_raw_text_delta():
-    """HTTP 模式正文以 SSE 为准；raw 流里的 text_delta 必须丢弃，否则每个字进两次队列。"""
+    """HTTP 模式正文以 SSE 为准；raw 流里的 text_delta 必须丢弃，否则每个字进两次队列。
+
+    注意锚点：`api_chat_stream` 里现在有**两处** `et == "text_delta"` —— 前一处是
+    2026-10-22 加的「思考进度」分支（`is_http and ev == "assistant_text_stream"`
+    里面的，只取 delta 喂进度行）。按裸的 `et == "text_delta"` 切第一段会切到它，
+    于是断言永远看不到 is_http。这里锚完整的 if 条件，切到真正的正文分支。
+    """
     import inspect
     src = inspect.getsource(web.api_chat_stream)
-    seg = src.split('et == "text_delta"')[1][:220]
+    marker = 'if ev == "assistant_text_stream" and et == "text_delta":'
+    assert marker in src, "正文分支的条件变了，请同步更新本测试的锚点"
+    seg = src.split(marker)[1][:220]
     assert "is_http" in seg, "HTTP 模式没有屏蔽 raw 流的正文，前端会看到重复内容"
 
 

@@ -91,12 +91,27 @@ jobs:
           done
 
       - name: ShellCheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: '.'
-          severity: warning
-          # 技能自带的 vendor 脚本不在本仓库维护范围内
-          ignore_paths: skills/builtin/video-production/vendor
+        # 原先用 ludeeus/action-shellcheck@master —— 它随 master 漂移：同一份代码，
+        # 2026-11-08 那次定时跑里它直接以 exit 2 退出（shellcheck 的 2 = 有文件读不了/
+        # 参数不对），11 秒就把整个 job 干掉，而本地 shellcheck 对 7 个脚本零告警。
+        # 改成显式调用系统 shellcheck：文件集自己算、版本可打印、失败点可读。
+        run: |
+          set -uo pipefail
+          command -v shellcheck >/dev/null 2>&1 || sudo apt-get install -y shellcheck
+          files=()
+          while IFS= read -r f; do
+            case "$f" in
+              skills/builtin/video-production/vendor/*) continue ;;
+              *.sh|*.bash|*.bats|*.dash|*.ksh) files+=("$f"); continue ;;
+            esac
+            if head -c 64 "$f" 2>/dev/null | head -1 | grep -qE '^#!.*(sh|bash)'; then
+              files+=("$f")
+            fi
+          done < <(git ls-files)
+          printf '待检文件 %d 个：\n' "${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+          shellcheck --version | head -2
+          shellcheck -x -S warning -f gcc "${files[@]}"
 
       # PowerShell 侧：解析 + 静态分析。作者的开发机是 Linux，改 setup.ps1 没法本地验证，
       # 这里是唯一的把关点，所以 Error 级别直接判失败。
@@ -119,7 +134,15 @@ jobs:
       - name: PSScriptAnalyzer
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+          # PSGallery 偶发拉不下来。上一版 job 耗时 5 分半、几乎全花在 Install-Module 上然后
+          # 直接 exit 1，日志里分不清是「模块装不上」还是「扫出 Error」。装不上属于环境问题，
+          # 打 warning 跳过；装上了就照常扫，Error 级别一律判失败。
+          try {
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+          } catch {
+            Write-Host "::warning::PSScriptAnalyzer 安装失败，跳过 PowerShell 静态分析：$($_.Exception.Message)"
+            exit 0
+          }
           $files = git ls-files '*.ps1' | Where-Object { $_ -notmatch 'vendor/' }
           if (-not $files) { throw '没找到要检查的 .ps1' }
           # -Path 只收单个字符串，传数组会抛错却仍让这一步「0 findings」通过 —— 必须逐个扫。
@@ -210,6 +233,13 @@ jobs:
           printf 'EASEL_LLM_BASE_URL=https://example.invalid/v1\n' >> .env
           printf 'CLAUDE_MODEL=anthropic/claude-sonnet-4-6\n' >> .env
 
+      # setup.sh 只在有 TTY 时建 .venv；CI 没有 TTY，它会退化成「装进系统 Python」，
+      # 于是后面 doctor 步找 .venv/bin/easel 必然落空（2026-11-06 那次就是 exit 127）。
+      # 这里显式建一次，让 CI 走真实用户路径（虚拟环境），两边行为才一致。
+      - name: Create venv
+        shell: bash
+        run: python -m venv .venv
+
       - name: Install (Linux/macOS)
         if: runner.os != 'Windows'
         run: bash setup.sh --openclaw
@@ -217,6 +247,9 @@ jobs:
       - name: Install (Windows)
         if: runner.os == 'Windows'
         shell: powershell       # 5.1：Windows 自带版本，必须按它验证
+        # 上一次它整整挂到 60 分钟上限才被杀，什么都看不出来；限到 30 分钟，
+        # 超时即失败，日志里最后一条 banner 就能定位卡在哪一步。
+        timeout-minutes: 30
         run: ./setup.ps1 -OpenClaw -NonInteractive
 
       # 这一条是重点：setup 必须可重入。2026.9.x 拒绝「会删掉已存在子键的整块写入」，
@@ -233,7 +266,12 @@ jobs:
       - name: doctor
         shell: bash
         run: |
+          # 三级兜底：venv 里有就用 venv 的；没有就退到 PATH（setup.sh 在无 TTY 下把
+          # console script 装进系统 Python）；最后才是 Windows 的 Scripts 路径。
+          # 老写法只有「.venv/bin/easel 存在」和「.venv/Scripts/easel.exe」两条路，
+          # 第一条不成立时在 ubuntu 上会去执行一个 Windows 路径 → exit 127。
           if [ -x .venv/bin/easel ]; then .venv/bin/easel doctor
+          elif command -v easel >/dev/null 2>&1; then easel doctor
           else .venv/Scripts/easel.exe doctor; fi
 
       - name: Upload install report

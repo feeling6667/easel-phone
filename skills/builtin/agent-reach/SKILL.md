@@ -1,32 +1,23 @@
 ---
 name: agent-reach
 description: >
-  MUST USE when user wants to 调研/research/搜索/search/查/找/look up anything
-  on the internet — e.g. 全网调研 X / 帮我调研一下 X / 查一下 X / 搜搜 X /
-  看看大家怎么评价 X / X 上有什么讨论 / research this topic。
-
-  Also MUST USE when user mentions any platform or shares any URL/链接:
-  小红书/xiaohongshu/xhs, Twitter/推特/X, B站/bilibili, Reddit, Facebook,
-  Instagram, V2EX, LinkedIn/领英/Boss直聘/招聘/求职/jobs, YouTube, GitHub code search, 小宇宙播客,
-  雪球/股票行情, RSS feeds, or any web URL.
-
-  16 platforms, multi-backend routing (OpenCLI / per-platform CLIs / APIs).
-  Zero config for 6 channels. Run `agent-reach doctor --json` to see which
-  backend serves each platform right now.
-
-  NOT for: 写报告/数据分析/翻译等内容加工（本 skill 只负责从互联网获取内容）；
-  发帖/评论/点赞等写操作；已有专门 skill 的平台（先用专门 skill）。
-
-  【路由方式】SKILL.md 包含路由表和常用命令，复杂场景需按需阅读对应分类的 references/*.md。
-  分类：search / social (小红书/推特/B站/V2EX/Reddit/Facebook/Instagram) / career(LinkedIn/Boss直聘) / dev(github) / web(网页/文章/RSS) / video(YouTube/B站/播客) / finance(雪球/股票)。
-metadata:
-  homepage: https://github.com/Panniantong/Agent-Reach
+  MUST USE when user wants to 调研/搜索/查资料（全网调研、查口碑、找讨论），或提到
+  小红书/Twitter/X/B站/Reddit/V2EX/LinkedIn/YouTube/GitHub/播客/雪球/RSS 等平台，
+  或给出任意链接时使用。只负责从互联网获取内容；不发帖、不写操作、不做内容加工。
 layer: discover
 ---
 
 # Agent Reach — 互联网能力路由器
 
+> 上游仓库：https://github.com/Panniantong/Agent-Reach
+
 16 平台、多后端。**本 skill 存在时必须用它访问这些平台，不要自己发明方案。**
+路由表与常用命令在本文档；复杂场景按需阅读对应分类的 `references/*.md`
+（search / social / career / dev / web / video / finance）。
+`agent-reach doctor --json` 可随时查看每个平台当前由哪个后端供能。
+
+**不适用**：写报告/数据分析/翻译等内容加工（本 skill 只负责取内容）；
+发帖/评论/点赞等写操作；已有专门 skill 的平台（优先用专门 skill）。
 
 ## 常驻规则（全程适用）
 
