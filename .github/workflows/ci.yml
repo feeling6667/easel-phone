@@ -251,9 +251,10 @@ jobs:
       - name: Install (Windows)
         if: runner.os == 'Windows'
         shell: powershell       # 5.1：Windows 自带版本，必须按它验证
-        # 上一次它整整挂到 60 分钟上限才被杀，什么都看不出来；限到 30 分钟，
-        # 超时即失败，日志里最后一条 banner 就能定位卡在哪一步。
-        timeout-minutes: 30
+        # 30 分钟不够：一次完整安装要下 ~1GB（pip 的重包在 Windows 上尤其慢），
+        # 2026-11 两次分别卡在 60 分钟和 30 分钟上限。这里放到 45 分钟并配合
+        # setup.ps1 里的 [HH:mm:ss] 时间戳 —— 真挂住能看见挂在哪一步，真只是慢则能跑完。
+        timeout-minutes: 45
         run: ./setup.ps1 -OpenClaw -NonInteractive
 
       # 这一条是重点：setup 必须可重入。2026.9.x 拒绝「会删掉已存在子键的整块写入」，

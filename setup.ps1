@@ -7,6 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($SkipOpenClaw -and $OpenClaw) { throw '不能同时指定 -SkipOpenClaw 和 -OpenClaw。' }
+$script:StartedAt = Get-Date
 $Root = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
 $Venv = Join-Path $Root '.venv'
 $Python = Join-Path $Venv 'Scripts\python.exe'
@@ -18,9 +19,12 @@ function Warn($Message) { Write-Host "  [!] $Message" -ForegroundColor Yellow }
 # 用 [OK] / [!] 这种 ASCII 标记而不是 ✓ / ⚠：cmd.exe 与较老的终端代码页并不可靠地
 # 支持 UTF-8，而本文件原有的 Ok() 已经是 [OK] 风格，不引入第二套符号。
 function Step($Index, $Title, $Subtitle) {
+    # 带上时间戳：CI 里一旦卡住，日志最后一条 [HH:mm:ss] 就能直接告诉你是哪一步、
+    # 前面各自花了多久 —— 这正是 2026-11 Windows 安装超时那次最缺的东西。
+    $stamp = (Get-Date).ToString('HH:mm:ss')
     Write-Host ''
     Write-Host ('-' * 52) -ForegroundColor DarkBlue
-    Write-Host "  [$Index] " -NoNewline -ForegroundColor Magenta
+    Write-Host "  [$stamp] [$Index] " -NoNewline -ForegroundColor Magenta
     Write-Host $Title -ForegroundColor Cyan
     Write-Host "  $Subtitle" -ForegroundColor DarkGray
 }
@@ -30,7 +34,7 @@ function Step($Index, $Title, $Subtitle) {
 #      runspace 里，拿不到 $Root / $Python / Install-RequiredCommand 改过的 PATH。
 #   2. 非 TTY（CI、重定向）下不要转圈：1Hz 的 `r 会刷出几千行无用日志。
 #   3. 失败时把日志尾部打出来，否则用户只看到一个 [FAIL] 不知道发生了什么。
-function Invoke-WithProgress([string]$Label, [string]$Exe, [string[]]$Arguments, [string]$WorkDir = $null) {
+function Invoke-WithProgress([string]$Label, [string]$Exe, [string[]]$Arguments, [string]$WorkDir = $null, [int]$TimeoutSeconds = 900) {
     $log = Join-Path ([System.IO.Path]::GetTempPath()) "easel-install-$(Get-Random).log"
     $startArgs = @{ FilePath = $Exe; ArgumentList = $Arguments; PassThru = $true;
                     NoNewWindow = $true; RedirectStandardOutput = $log;
@@ -41,8 +45,21 @@ function Invoke-WithProgress([string]$Label, [string]$Exe, [string[]]$Arguments,
     if ($quiet) { Write-Host "  [....] $Label 开始（非交互终端，不显示进度）" }
     $frames = @('[>   ]', '[=>  ]', '[==> ]', '[===>]')
     $t0 = Get-Date
+    # 上限是必须的：这个 while 只看 HasExited，子进程若因网络/安装器弹窗真正挂住，
+    # 循环会安静地转到天荒地老（2026-11 windows-latest 那次一小时就是这么没的）。
+    $limit = if ($TimeoutSeconds -gt 0) { $t0.AddSeconds($TimeoutSeconds) } else { $null }
     $i = 0
     while (-not $proc.HasExited) {
+        if ($null -ne $limit -and (Get-Date) -ge $limit) {
+            if (-not $quiet) { Write-Host "`r$(' ' * 60)`r" -NoNewline }
+            Write-Host ("  [FAIL] {0} 超过 {1} 分钟仍未结束，已终止" -f $Label, [int]($TimeoutSeconds / 60)) -ForegroundColor Red
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            foreach ($f in @($log, "$log.err")) {
+                if (Test-Path $f) { Get-Content $f -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ } }
+            }
+            Remove-Item $log, "$log.err" -Force -ErrorAction SilentlyContinue
+            return $false
+        }
         if (-not $quiet) {
             $el = [int]((Get-Date) - $t0).TotalSeconds
             Write-Host ("`r  {0} 进行中 {1} 已运行 {2}s" -f $frames[$i % 4], $Label, $el) -NoNewline
@@ -67,7 +84,9 @@ function Invoke-WithProgress([string]$Label, [string]$Exe, [string[]]$Arguments,
 # 结尾汇总。变宽内容不套框线：中文是双宽字符，按字符数 padding 的 ASCII 框一定错位。
 function Show-Summary {
     $n = $script:Warnings.Count
+    $elapsed = [int]((Get-Date) - $script:StartedAt).TotalSeconds
     Write-Host ''
+    Write-Host ("  各步耗时见上面的 [HH:mm:ss] 时间戳；总计 {0} 分 {1} 秒" -f [int]($elapsed / 60), ($elapsed % 60)) -ForegroundColor DarkGray
     if ($n -eq 0) { Write-Host '  [OK] Easel 安装完成' -ForegroundColor Green }
     else { Write-Host "  [OK] Easel 安装完成（有 $n 项降级）" -ForegroundColor Yellow }
     if ($n -gt 0) {
