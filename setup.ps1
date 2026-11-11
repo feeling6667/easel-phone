@@ -22,6 +22,14 @@ function Step($Index, $Title, $Subtitle) {
     # 带上时间戳：CI 里一旦卡住，日志最后一条 [HH:mm:ss] 就能直接告诉你是哪一步、
     # 前面各自花了多久 —— 这正是 2026-11 Windows 安装超时那次最缺的东西。
     $stamp = (Get-Date).ToString('HH:mm:ss')
+    # 在 CI 里额外做两件事：把这一步写成 annotation（运行页公开可见，不用登录就能读，
+    # 卡死时"最后一条 notice"就是卡住的位置），同时落一份进度文件供失败后回收。
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Host ("::notice title=install step::{0} [{1}] {2}" -f $stamp, $Index, $Title)
+        if ($env:RUNNER_TEMP) {
+            try { Add-Content -Path (Join-Path $env:RUNNER_TEMP 'easel-setup-progress.txt') -Value ("{0} [{1}] {2}" -f $stamp, $Index, $Title) -Encoding UTF8 } catch { }
+        }
+    }
     Write-Host ''
     Write-Host ('-' * 52) -ForegroundColor DarkBlue
     Write-Host "  [$stamp] [$Index] " -NoNewline -ForegroundColor Magenta

@@ -208,6 +208,7 @@ jobs:
     name: Real install (${{ matrix.os }})
     if: >-
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      || github.event_name == 'push'
       || contains(github.event.pull_request.labels.*.name, 'ci:full-install')
     strategy:
       fail-fast: false
@@ -287,3 +288,25 @@ jobs:
           path: |
             outputs/_install/last-install.json
           if-no-files-found: warn
+
+      # setup.ps1 在每一步把 [HH:mm:ss] 写进这个文件；安装被超时杀掉时，控制台日志要
+      # 登录才能看，但这里的输出会变成运行页可见的 annotation（匿名也能读），
+      # 所以「卡在第几步」永远不会再变成黑盒。
+      - name: Report install progress
+        if: always() && runner.os == 'Windows'
+        shell: bash
+        run: |
+          f="${RUNNER_TEMP}/easel-setup-progress.txt"
+          if [ ! -f "$f" ]; then
+            echo "::warning title=install progress::没有进度文件，安装可能没跑到第一个步骤"
+            exit 0
+          fi
+          {
+            echo "### 安装进度（最后到达的步骤）"
+            echo '```'
+            tail -n 25 "$f"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          tail -n 8 "$f" | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=install progress::$line"
+          done
